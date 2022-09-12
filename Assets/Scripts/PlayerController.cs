@@ -36,20 +36,13 @@ public class PlayerController : MonoBehaviour
     [Header("Climbing")]
     #region Climbing
     [SerializeField]
-    private float _wallAngleMax;
+    private LayerMask layerMaskClimb;
     [SerializeField]
-    private float _groundAngleMax;
+    private bool canClimb;
     [SerializeField]
-    private LayerMask _layerMaskClimb;
+    private float maxHeight;
     #endregion
 
-    [Header("Heights")]
-    [SerializeField]
-    private float _overpassHeight;
-
-    [Header("Offsets")]
-    [SerializeField]
-    private float _climbOriginDown;
 
     #region Private Properties
     private float currentSpeed;
@@ -57,7 +50,9 @@ public class PlayerController : MonoBehaviour
     private Animator animator;
     private Transform cameraT;
     private CharacterController controller;
-    private bool _climbing;
+    private bool isClimbing = false;
+    private Vector3 placeToJump = Vector3.one;
+    
     #endregion
     private void Start()
     {
@@ -71,45 +66,18 @@ public class PlayerController : MonoBehaviour
     {
         Vector2 input = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
         bool running = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.Joystick1Button10);
-        Move(input, running);
+        if(!isClimbing)
+            Move(input, running);
 
-        HandleJumping();
+        //HandleJumping();
 
-        //HandleClimbing(running);
-
+        HandleClimbing();
 
         float animationSpeedPercent = ((running) ? currentSpeed / runSpeed : currentSpeed / walkSpeed * .5f);
         animator.SetFloat("speedPercentage", animationSpeedPercent, speedSmoothTime, Time.deltaTime);
     }
 
-    /*private void HandleClimbing(bool running)
-    {
-        if (running)
-        {
-            if (CanClimb)
-            {
 
-            }
-        }
-    }*/
-
-    /*private bool CanClimb()
-    {
-        bool _downHit;
-        bool _forwardHit;
-        bool _overpassHit;
-        float _climbHeight;
-        float _groundAngle;
-        float _wallAngle;
-
-        RaycastHit _downRaycastHit;
-        RaycastHit _forwardRaycastHit;
-        RaycastHit _overpassRaycastHit;
-
-        Vector3 _endPosition;
-        Vector3 _forwardDirectionXZ;
-        Vector3 _forwardNormalXZ;
-    }*/
 
     void HandleJumping()
     {
@@ -127,6 +95,48 @@ public class PlayerController : MonoBehaviour
         {
             Debug.Log(hit.transform.name + " - " + (Vector3.Distance(feetRaycast.position, hit.point)));
         }*/
+    }
+
+    void HandleClimbing()
+    {
+        RaycastHit ray;
+        if(Physics.Raycast(transform.position + transform.forward/2 + new Vector3(0, maxHeight, 0), - Vector3.up, out ray, maxHeight, layerMaskClimb))
+        {
+            canClimb = true;
+        } else
+        {
+            canClimb = false;
+        }
+
+        if (canClimb == true)
+        {
+            if (Input.GetAxis("Jump") == 1 && !isClimbing)
+            {
+                isClimbing = true;
+                placeToJump = ray.point;                
+            }
+        }
+
+        animator.SetBool("isClimbing", isClimbing);
+
+        if (animator.GetCurrentAnimatorStateInfo(0).IsName("Step Up"))
+        {
+            MatchTarget(placeToJump, transform.rotation, AvatarTarget.LeftFoot, new MatchTargetWeightMask(Vector3.one, 0), 0.3f, 0.66f);
+        }
+
+        if (isClimbing && !animator.isMatchingTarget)
+        {
+            isClimbing = false;
+        }
+
+    }
+
+    public void MatchTarget(Vector3 matchPosition, Quaternion matchRotation, AvatarTarget target, MatchTargetWeightMask weightMask, float normalisedStartTime, float normalisedEndTime)
+    {
+        if (animator.isMatchingTarget)
+            return;
+
+        animator.MatchTarget(matchPosition, matchRotation, target, weightMask, normalisedStartTime, normalisedEndTime);
     }
 
     void Move(Vector2 input, bool running)
